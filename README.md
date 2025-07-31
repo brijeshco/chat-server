@@ -2,6 +2,10 @@
 
 This is a real-time chat server built with Node.js, Express, Socket.IO, and MongoDB. It supports user authentication, multiple chat rooms, and persists chat history.
 
+## Live Demo
+
+You can access the live application here: [https://codtech-chat-backend.onrender.com/](https://codtech-chat-backend.onrender.com/)
+
 ## Features
 
 - **User Authentication**: Secure user registration and login using JWT.
