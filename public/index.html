@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CODTECH Chat with Authentication</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 500px;
+        margin: 20px auto;
+        padding: 15px;
+        background: #fafafa;
+      }
+      #loginDiv,
+      #registerDiv,
+      #chatDiv {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        background: white;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 8px;
+        margin: 5px 0 10px 0;
+        box-sizing: border-box;
+        border: 1px solid #aaa;
+        border-radius: 3px;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button:disabled {
+        background: #999;
+        cursor: not-allowed;
+      }
+      #messages {
+        border: 1px solid #ddd;
+        padding: 10px;
+        height: 300px;
+        overflow-y: auto;
+        background: #f7f7f7;
+        list-style: none;
+      }
+      #messages li {
+        margin-bottom: 8px;
+        padding: 6px 10px;
+        background: #e2e2e2;
+        border-radius: 5px;
+        word-wrap: break-word;
+      }
+      #welcomeText {
+        margin-bottom: 15px;
+      }
+      #logoutBtn {
+        background: #dc3545;
+        margin-bottom: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>CODTECH Real-Time Chat</h2>
+
+    <div id="registerDiv">
+      <h3>Register</h3>
+      <input id="registerUsername" placeholder="Username" />
+      <input id="registerPassword" type="password" placeholder="Password" />
+      <button id="registerBtn">Register</button>
+      <p id="registerMsg" style="color: red"></p>
+    </div>
+
+    <div id="loginDiv">
+      <h3>Login</h3>
+      <input id="loginUsername" placeholder="Username" />
+      <input id="loginPassword" type="password" placeholder="Password" />
+      <button id="loginBtn">Login</button>
+      <p id="loginMsg" style="color: red"></p>
+    </div>
+
+    <div id="chatDiv" style="display: none">
+      <div id="welcomeText"></div>
+      <button id="logoutBtn">Logout</button>
+
+      <input id="roomInput" placeholder="Room name" />
+      <button id="joinRoomBtn">Join Room</button>
+
+      <h4>Current Room: <span id="currentRoom">None</span></h4>
+      <ul id="messages"></ul>
+
+      <input id="messageInput" placeholder="Type a message" />
+      <button id="sendBtn">Send</button>
+    </div>
+
+    <script>
+      let socket = null;
+      let currentRoom = null;
+      let token = localStorage.getItem('token') || null;
+      let username = localStorage.getItem('username') || null;
+
+      const registerDiv = document.getElementById('registerDiv');
+      const loginDiv = document.getElementById('loginDiv');
+      const chatDiv = document.getElementById('chatDiv');
+
+      const registerUsername = document.getElementById('registerUsername');
+      const registerPassword = document.getElementById('registerPassword');
+      const registerBtn = document.getElementById('registerBtn');
+      const registerMsg = document.getElementById('registerMsg');
+
+      const loginUsername = document.getElementById('loginUsername');
+      const loginPassword = document.getElementById('loginPassword');
+      const loginBtn = document.getElementById('loginBtn');
+      const loginMsg = document.getElementById('loginMsg');
+
+      const welcomeText = document.getElementById('welcomeText');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      const roomInput = document.getElementById('roomInput');
+      const joinRoomBtn = document.getElementById('joinRoomBtn');
+
+      const currentRoomSpan = document.getElementById('currentRoom');
+      const messagesList = document.getElementById('messages');
+      const messageInput = document.getElementById('messageInput');
+      const sendBtn = document.getElementById('sendBtn');
+
+      // Helper: Update UI according to auth state
+      function updateUI() {
+        if (token && username) {
+          registerDiv.style.display = 'none';
+          loginDiv.style.display = 'none';
+          chatDiv.style.display = 'block';
+          welcomeText.textContent = `Welcome, ${username}!`;
+        } else {
+          registerDiv.style.display = 'block';
+          loginDiv.style.display = 'block';
+          chatDiv.style.display = 'none';
+          currentRoomSpan.textContent = 'None';
+        }
+      }
+
+      updateUI();
+
+      // Register user
+      registerBtn.onclick = async () => {
+        registerMsg.textContent = '';
+        const user = registerUsername.value.trim();
+        const pass = registerPassword.value;
+        if (!user || !pass) {
+          registerMsg.textContent = 'Username and password are required';
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            registerMsg.style.color = 'green';
+            registerMsg.textContent =
+              'Registered successfully! You can login now.';
+            registerUsername.value = '';
+            registerPassword.value = '';
+          } else {
+            registerMsg.style.color = 'red';
+            registerMsg.textContent = data.message || 'Registration failed';
+          }
+        } catch {
+          registerMsg.style.color = 'red';
+          registerMsg.textContent = 'Server error during registration';
+        }
+      };
+
+      // Login user
+      loginBtn.onclick = async () => {
+        loginMsg.textContent = '';
+        const user = loginUsername.value.trim();
+        const pass = loginPassword.value;
+        if (!user || !pass) {
+          loginMsg.textContent = 'Username and password are required';
+          return;
+        }
+        try {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            token = data.token;
+            username = data.username;
+            localStorage.setItem('token', token);
+            localStorage.setItem('username', username);
+            loginUsername.value = '';
+            loginPassword.value = '';
+            loginMsg.textContent = '';
+            connectSocket();
+            updateUI();
+          } else {
+            loginMsg.textContent = data.message || 'Login failed';
+          }
+        } catch {
+          loginMsg.textContent = 'Server error during login';
+        }
+      };
+
+      // Logout
+      logoutBtn.onclick = () => {
+        token = null;
+        username = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        if (socket) socket.disconnect();
+        currentRoom = null;
+        messagesList.innerHTML = '';
+        updateUI();
+      };
+
+      // Connect socket with auth token
+      function connectSocket() {
+        if (!token) return;
+        socket = io({
+          auth: { token },
+        });
+
+        socket.on('connect_error', (err) => {
+          alert('Socket connection error: ' + err.message);
+        });
+
+        socket.on('roomHistory', (messages) => {
+          messagesList.innerHTML = '';
+          messages.forEach((msg) => {
+            addMessage(msg.username, msg.message);
+          });
+        });
+
+        socket.on('chatMessage', (data) => {
+          addMessage(data.username, data.message);
+        });
+      }
+
+      // Join room button
+      joinRoomBtn.onclick = () => {
+        const room = roomInput.value.trim();
+        if (!room) {
+          alert('Please enter a room name');
+          return;
+        }
+        if (!socket) {
+          alert('Not connected to chat server');
+          return;
+        }
+        socket.emit('joinRoom', room);
+        currentRoom = room;
+        currentRoomSpan.textContent = room;
+        messagesList.innerHTML = '';
+      };
+
+      // Send message button
+      sendBtn.onclick = () => {
+        const message = messageInput.value.trim();
+        if (!message) return;
+        if (!currentRoom) {
+          alert('Please join a room first');
+          return;
+        }
+        socket.emit('chatMessage', { room: currentRoom, message });
+        messageInput.value = '';
+      };
+
+      // Add message to DOM
+      function addMessage(user, msg) {
+        const li = document.createElement('li');
+        li.textContent = `${user}: ${msg}`;
+        messagesList.appendChild(li);
+        messagesList.scrollTop = messagesList.scrollHeight;
+      }
+
+      // Auto-connect if token present on load
+      if (token) {
+        connectSocket();
+      }
+    </script>
+  </body>
+</html>
