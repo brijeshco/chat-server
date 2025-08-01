@@ -4,7 +4,7 @@ This is a real-time chat server built with Node.js, Express, Socket.IO, and Mong
 
 ## Live Demo
 
-You can access the live application here: [https://chat-server-avxy.onrender.com](https://codtech-chat-backend.onrender.com/)
+You can access the live application here: [https://chat-server-avxy.onrender.com](https://chat-server-avxy.onrender.com)
 
 ## Features
 
